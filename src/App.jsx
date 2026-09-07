@@ -17,6 +17,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import problems from './problems.json';
+import ManagerAnimation from './ManagerAnimation.jsx';
 
 function Markdown({ text }) {
   return (
@@ -670,6 +671,21 @@ export default function App() {
               )}
               {step === 1 && result && (
                 <>
+                  {result.animation && (
+                    <ManagerAnimation
+                      key={`${problemId}-${result.duration}`}
+                      trace={result.animation}
+                      stale={Boolean(stale)}
+                    />
+                  )}
+                  {problemId === 570 && !result.animation && (
+                    <p className="step-description">
+                      La animación guiada corresponde al JOIN y GROUP BY de la
+                      consulta inicial. Puedes cambiar el umbral de HAVING.
+                      Restablece la consulta para verla; para otras consultas se
+                      muestran las tablas calculadas a continuación.
+                    </p>
+                  )}
                   <p className="step-description">{result.note}</p>
                   {result.stages.map((s, i) => (
                     <div className="intermediate-stage" key={i}>

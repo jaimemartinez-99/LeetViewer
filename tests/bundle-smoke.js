@@ -6,13 +6,22 @@ import assert from 'node:assert/strict';
 
 const dist = new URL('../dist/', import.meta.url);
 const assets = await readdir(new URL('assets/', dist));
-const workerFile = assets.find(name => name.startsWith('sql.worker-'));
+const workerFile = assets.find((name) => name.startsWith('sql.worker-'));
 const source = await readFile(new URL(`assets/${workerFile}`, dist), 'utf8');
-const problems = JSON.parse(await readFile(new URL('../src/problems.json', import.meta.url)));
+const problems = JSON.parse(
+  await readFile(new URL('../src/problems.json', import.meta.url)),
+);
 const messages = [];
 const scope = {
-  console, WebAssembly, performance, URL, TextDecoder, TextEncoder,
-  setTimeout, clearTimeout, Response,
+  console,
+  WebAssembly,
+  performance,
+  URL,
+  TextDecoder,
+  TextEncoder,
+  setTimeout,
+  clearTimeout,
+  Response,
   location: { href: `https://leetviewer.invalid/assets/${workerFile}` },
   importScripts() {},
   async fetch(url) {
@@ -22,10 +31,15 @@ const scope = {
       headers: { 'Content-Type': 'application/wasm' },
     });
   },
-  postMessage(message) { messages.push(JSON.parse(JSON.stringify(message))); },
+  postMessage(message) {
+    messages.push(JSON.parse(JSON.stringify(message)));
+  },
 };
 scope.self = scope;
-runInNewContext(source.replaceAll('import.meta.url', JSON.stringify(scope.location.href)), scope);
+runInNewContext(
+  source.replaceAll('import.meta.url', JSON.stringify(scope.location.href)),
+  scope,
+);
 await scope.onmessage({ data: { id: 1, type: 'init', problem: problems[0] } });
 assert.equal(messages[0].error, undefined);
 assert.equal(messages[0].result.length, 2);
@@ -33,6 +47,27 @@ await scope.onmessage({ data: { id: 2, type: 'run', sql: problems[0].query } });
 assert.equal(messages[1].error, undefined);
 assert.equal(messages[1].result.final.values.length, 5);
 assert.equal(messages[1].result.final.values[0][0], null);
-await scope.onmessage({ data: { id: 3, type: 'run', sql: 'SELECT missing FROM Employees' } });
+await scope.onmessage({
+  data: { id: 3, type: 'run', sql: 'SELECT missing FROM Employees' },
+});
 assert.match(messages[2].error, /no such column/);
-console.log('Production worker + local WASM: initialization, JOIN, NULL and errors verified.');
+console.log(
+  'Production worker + local WASM: initialization, JOIN, NULL and errors verified.',
+);
+const manager = problems.find((problem) => problem.id === 570);
+await scope.onmessage({ data: { id: 4, type: 'init', problem: manager } });
+await scope.onmessage({ data: { id: 5, type: 'run', sql: manager.query } });
+assert.equal(messages.at(-1).error, undefined);
+assert.equal(messages.at(-1).result.animation.matches.length, 7);
+assert.deepEqual(
+  messages
+    .at(-1)
+    .result.animation.groups.map((g) => [g.name, g.count, g.passes]),
+  [
+    ['John', 5, true],
+    ['Sara', 2, false],
+  ],
+);
+console.log(
+  'Production animation trace: 7 joined rows, 2 groups, 1 selected manager verified.',
+);
