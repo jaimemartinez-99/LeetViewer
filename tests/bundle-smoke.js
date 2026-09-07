@@ -3,22 +3,24 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 import assert from 'node:assert/strict';
+import problems from '../src/catalog.js';
 
 const dist = new URL('../dist/', import.meta.url);
 const assets = await readdir(new URL('assets/', dist));
 const workerFile = assets.find((name) => name.startsWith('sql.worker-'));
 const source = await readFile(new URL(`assets/${workerFile}`, dist), 'utf8');
-const problems = JSON.parse(
-  await readFile(new URL('../src/problems.json', import.meta.url)),
-);
 const messages = [];
 const scope = {
   console,
   WebAssembly,
+  // WebAssembly is injected from the host realm, so its native exceptions must
+  // share that realm too. sql.js catches TypeError when wrapping JS callbacks.
+  TypeError,
   performance,
   URL,
   TextDecoder,
   TextEncoder,
+  structuredClone,
   setTimeout,
   clearTimeout,
   Response,
@@ -58,16 +60,48 @@ const manager = problems.find((problem) => problem.id === 570);
 await scope.onmessage({ data: { id: 4, type: 'init', problem: manager } });
 await scope.onmessage({ data: { id: 5, type: 'run', sql: manager.query } });
 assert.equal(messages.at(-1).error, undefined);
-assert.equal(messages.at(-1).result.animation.matches.length, 7);
-assert.deepEqual(
-  messages
-    .at(-1)
-    .result.animation.groups.map((g) => [g.name, g.count, g.passes]),
-  [
-    ['John', 5, true],
-    ['Sara', 2, false],
-  ],
+const trace = messages.at(-1).result.animation;
+assert.equal(trace.supported, true);
+assert.equal(
+  trace.stages.find((s) => s.op === 'join').tables[0].rows.length,
+  7,
 );
+assert.deepEqual(
+  trace.stages
+    .find((s) => s.op === 'group')
+    .tables[0].groups.map((g) => g.count),
+  [5, 2],
+);
+assert.equal(
+  trace.stages.find((s) => s.op === 'having').tables[0].rows.length,
+  1,
+);
+assert.deepEqual(
+  trace.stages.at(-1).tables[0].rows.map((r) => r.cells.map((c) => c.value)),
+  [['John']],
+);
+for (const problem of problems) {
+  await scope.onmessage({ data: { id: 6, type: 'init', problem } });
+  await scope.onmessage({ data: { id: 7, type: 'run', sql: problem.query } });
+  assert.equal(messages.at(-1).error, undefined);
+  assert.equal(
+    messages.at(-1).result.animation?.supported,
+    true,
+    problem.title,
+  );
+  const result = messages.at(-1).result;
+  assert.deepEqual(
+    result.final.values.map(row => JSON.stringify(row)).sort(),
+    problem.expected.map(row => JSON.stringify(row)).sort(),
+    problem.title,
+  );
+}
+await scope.onmessage({
+  data: { id: 8, type: 'run', sql: 'SELECT (SELECT 1)' },
+});
+assert.equal(messages.at(-1).result.animation, null);
+assert.match(messages.at(-1).result.animationReason, /subconsultas/i);
+assert.deepEqual(messages.at(-1).result.final.values, [[1]]);
 console.log(
-  'Production animation trace: 7 joined rows, 2 groups, 1 selected manager verified.',
+  'Production SQL 50: all 50 reference results and animations verified, including isolated DELETE and REGEXP.',
 );

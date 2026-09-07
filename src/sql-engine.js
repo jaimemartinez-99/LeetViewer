@@ -155,6 +155,16 @@ export function createProblemDatabase(SQL, problem) {
   const db = new SQL.Database();
   try {
     db.run(problem.setup);
+    db.create_function('regexp', (pattern, value) => {
+      if (value === null || pattern === null) return 0;
+      const match = new RegExp(String(pattern)).exec(String(value));
+      // Unlike JavaScript $, SQL exercise matching must reject a trailing newline.
+      return Number(
+        Boolean(match) &&
+          (!String(pattern).endsWith('$') ||
+            match.index + match[0].length === String(value).length),
+      );
+    });
     db.run('PRAGMA query_only = ON');
     return db;
   } catch (error) {

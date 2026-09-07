@@ -16,8 +16,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
-import problems from './problems.json';
-import ManagerAnimation from './ManagerAnimation.jsx';
+import problems, { sections } from './catalog.js';
+import SQLAnimation from './SQLAnimation.jsx';
 
 function Markdown({ text }) {
   return (
@@ -358,7 +358,7 @@ export default function App() {
             </span>
           </a>
           <div className="collection-title">
-            <span>COLECCIÓN DE PRÁCTICA</span>
+            <span>LEETCODE SQL 50</span>
             <span>{problems.length}</span>
           </div>
           <h2>Problemas SQL</h2>
@@ -375,26 +375,40 @@ export default function App() {
             ))}
           </div>
           <nav aria-label="Problemas SQL">
-            {visible.map((p) => (
-              <button
-                key={p.id}
-                className={`problem-item ${p.id === problemId ? 'active' : ''}`}
-                aria-current={p.id === problemId ? 'page' : undefined}
-                onClick={() => selectProblem(p)}
-              >
-                <div>
-                  <span className="problem-number">{p.id}</span>
-                  <span className={`difficulty ${p.difficulty.toLowerCase()}`}>
-                    {p.difficulty}
-                  </span>
-                </div>
-                <span className="problem-title">{p.title}</span>
-                <small>{p.topic}</small>
-                {p.id === problemId && (
-                  <ChevronRight className="problem-chevron" size={16} />
-                )}
-              </button>
-            ))}
+            {sections.map(([section, ids]) => {
+              const items = ids
+                .map((id) => visible.find((p) => p.id === id))
+                .filter(Boolean);
+              return (
+                items.length > 0 && (
+                  <div key={section}>
+                    <h3 className="catalog-section">{section}</h3>
+                    {items.map((p) => (
+                      <button
+                        key={p.id}
+                        className={`problem-item ${p.id === problemId ? 'active' : ''}`}
+                        aria-current={p.id === problemId ? 'page' : undefined}
+                        onClick={() => selectProblem(p)}
+                      >
+                        <div>
+                          <span className="problem-number">{p.id}</span>
+                          <span
+                            className={`difficulty ${p.difficulty.toLowerCase()}`}
+                          >
+                            {p.difficulty}
+                          </span>
+                        </div>
+                        <span className="problem-title">{p.title}</span>
+                        <small>{p.topic}</small>
+                        {p.id === problemId && (
+                          <ChevronRight className="problem-chevron" size={16} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )
+              );
+            })}
           </nav>
           <div className="sidebar-bottom">
             <span className="status-dot" />
@@ -446,6 +460,12 @@ export default function App() {
               </span>
             </div>
             <Markdown text={problem.description} />
+            <p className="solution-source">
+              <a href={problem.sourceUrl} target="_blank" rel="noreferrer">
+                Ver enunciado original en LeetCode ↗
+              </a>
+              <span>{problem.solutionSource} · Datos de práctica locales</span>
+            </p>
             <button
               className="hint-button"
               onClick={() => setHint(!hint)}
@@ -672,21 +692,20 @@ export default function App() {
               {step === 1 && result && (
                 <>
                   {result.animation && (
-                    <ManagerAnimation
+                    <SQLAnimation
                       key={`${problemId}-${result.duration}`}
                       trace={result.animation}
                       stale={Boolean(stale)}
                     />
                   )}
-                  {problemId === 570 && !result.animation && (
-                    <p className="step-description">
-                      La animación guiada corresponde al JOIN y GROUP BY de la
-                      consulta inicial. Puedes cambiar el umbral de HAVING.
-                      Restablece la consulta para verla; para otras consultas se
-                      muestran las tablas calculadas a continuación.
-                    </p>
+                  {!result.animation && result.animationReason && (
+                    <p className="step-description">{result.animationReason}</p>
                   )}
-                  <p className="step-description">{result.note}</p>
+                  <p className="step-description">
+                    {result.animation
+                      ? 'La animación muestra las operaciones lógicas de tu consulta, con valores calculados en SQLite. No representa el plan físico del optimizador.'
+                      : result.note}
+                  </p>
                   {result.stages.map((s, i) => (
                     <div className="intermediate-stage" key={i}>
                       <pre>{s.sql}</pre>
@@ -709,8 +728,9 @@ export default function App() {
               {step === 2 && result && (
                 <>
                   <p className="step-description">
-                    Resultado real de tu consulta, con la selección de columnas,
-                    agrupaciones y orden que hayas indicado.
+                    {problem.mode === 'delete'
+                      ? 'Resultado de tu consulta. Si ejecutas DELETE, se muestra Person después del borrado sobre una copia temporal.'
+                      : 'Resultado real de tu consulta, con la selección de columnas, agrupaciones y orden que hayas indicado.'}
                   </p>
                   <DataTable
                     key={result.sql}

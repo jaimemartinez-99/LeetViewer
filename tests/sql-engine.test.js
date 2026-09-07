@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import problems from '../src/catalog.js';
 import initSqlJs from 'sql.js';
 import {
   validateQuery,
@@ -11,29 +11,27 @@ import {
   readResult,
 } from '../src/sql-engine.js';
 
-const problems = JSON.parse(
-  await readFile(new URL('../src/problems.json', import.meta.url)),
-);
 const SQL = await initSqlJs();
 
 test('all fixtures initialize and their starter queries execute', () => {
-  const expectedCounts = [5, 2, 4, 3, 1, 1, 6];
-  problems.forEach((problem, i) => {
-    const db = createProblemDatabase(SQL, problem);
-    try {
-      assert.equal(getBaseTables(db, problem).length, problem.tables.length);
-      const output = executePipeline(db, problem.query);
-      assert.equal(
-        output.final.values.length,
-        expectedCounts[i],
-        problem.title,
-      );
-      if ([550, 185].includes(problem.id))
-        assert.equal(output.stages.length, 0);
-    } finally {
-      db.close();
-    }
-  });
+  problems
+    .filter((p) => p.mode !== 'delete')
+    .forEach((problem) => {
+      const db = createProblemDatabase(SQL, problem);
+      try {
+        assert.equal(getBaseTables(db, problem).length, problem.tables.length);
+        const output = executePipeline(db, problem.query);
+        assert.equal(
+          output.final.values.length,
+          problem.expected.length,
+          problem.title,
+        );
+        if ([550, 185].includes(problem.id))
+          assert.equal(output.stages.length, 0);
+      } finally {
+        db.close();
+      }
+    });
 });
 
 test('LEFT JOIN preserves missing identifiers as NULL', () => {

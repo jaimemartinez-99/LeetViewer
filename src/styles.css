@@ -913,3 +913,20 @@ kbd {
     transition-duration: 0.01ms !important;
   }
 }
+/* SQL 50 sections and exercise provenance. */
+.catalog-section {
+  margin: 20px 12px 8px;
+  color: #a2b5c7;
+  font-size: 14px;
+  font-weight: 600;
+}
+.solution-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 14px;
+  color: #9aa8b7;
+}
+.solution-source a {
+  color: #a3e6b4;
+}
